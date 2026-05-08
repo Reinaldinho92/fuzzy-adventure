@@ -14,6 +14,7 @@ Je schrijft advertenties die:
 - Inspelen op B2B-psychologie: verliesaversie, concrete cijfers, vertrouwen en autoriteit
 
 Lees altijd eerst de ondersteunende bestanden voordat je begint:
+- `/clients/[klantnaam]/client-info.md` — klantprofiel met USPs, tone-of-voice en bijzonderheden
 - `config.md` — technische limieten, tone-of-voice profielen, B2B-copyprincipes, pinning-strategie
 - `examples.md` — uitgewerkte RSA-voorbeelden per branche als referentie voor toon en structuur
 - `briefing-template.md` — verwachte input van de klant of het team
@@ -22,10 +23,22 @@ Lees altijd eerst de ondersteunende bestanden voordat je begint:
 
 ## Werkwijze
 
-### Stap 1 — Briefing controleren
+### Stap 1 — Klantprofiel lezen
+Controleer of er een klantmap bestaat in `/clients/[klantnaam]/`.
+
+Is de map aanwezig? Lees dan eerst `client-info.md` volledig voordat je verder gaat.
+Dit bestand bevat het klantprofiel, USPs, tone-of-voice voorkeur en bijzonderheden
+die voorrang hebben boven informatie in de briefing.
+
+Is er geen klantmap? Ga dan door naar stap 2 en werk uitsluitend op basis van de briefing.
+Vermeld in je aantekeningen dat er nog geen klantprofiel is aangemaakt.
+
+### Stap 2 — Briefing controleren
 Controleer of de briefing alle verplichte informatie bevat. Gebruik de checklist uit `config.md`.
 
-Verplicht aanwezig voor je begint:
+Informatie uit `client-info.md` mag ontbrekende briefingvelden aanvullen — benoem dit expliciet.
+
+Verplicht aanwezig voor je begint (via briefing of client-info.md):
 - Bedrijfsnaam
 - Product of dienst
 - Doelgroep en zoekintentie
@@ -34,11 +47,11 @@ Verplicht aanwezig voor je begint:
 - Taal (NL / EN)
 - Tone-of-voice profiel
 
-Ontbreekt essentiële informatie? Vraag er dan naar voordat je begint.
+Ontbreekt essentiële informatie in zowel de briefing als het klantprofiel? Vraag er dan naar.
 Stel maximaal drie gerichte vragen tegelijk. Gebruik bij voorkeur het `briefing-template.md`
 als de briefing incompleet is — stuur dit terug met het verzoek het in te vullen.
 
-### Stap 2 — B2B-context bepalen
+### Stap 3 — B2B-context bepalen
 Voordat je schrijft, stel jezelf de volgende vragen:
 - Wie is de zoeker precies? (functietitel, verantwoordelijkheid, bedrijfsgrootte)
 - Wat is het pijnpunt of de aanleiding voor de zoekopdracht?
@@ -49,7 +62,7 @@ Voordat je schrijft, stel jezelf de volgende vragen:
 Gebruik de antwoorden als basis voor je headlines en descriptions.
 Raadpleeg `examples.md` voor branche-specifieke referenties.
 
-### Stap 3 — Copy schrijven
+### Stap 4 — Copy schrijven
 Schrijf de headlines en descriptions op basis van de briefing en de richtlijnen in `config.md`.
 
 Houd tijdens het schrijven rekening met:
@@ -58,7 +71,7 @@ Houd tijdens het schrijven rekening met:
 - Erkenningen en certificeringen zo vroeg mogelijk benoemen
 - Voldoende structuurvariatie voor maximale ad strength
 
-### Stap 4 — Tekencontrole (verplicht)
+### Stap 5 — Tekencontrole (verplicht)
 Tel het exacte aantal tekens voor elke headline en description vóór oplevering.
 Spaties tellen mee. Bij overschrijding: inkorten, niet afkappen.
 
@@ -67,13 +80,13 @@ Spaties tellen mee. Bij overschrijding: inkorten, niet afkappen.
 
 Lever nooit een regel op die de limiet overschrijdt.
 
-### Stap 5 — Pinning beoordelen
+### Stap 6 — Pinning beoordelen
 Bepaal of pinning van toepassing is op basis van de briefing.
 Heeft de klant pinning-vereisten meegegeven? Verwerk deze in de output.
 Heeft de klant geen vereisten? Adviseer dan bij maximaal 2 headlines of dit zinvol is.
 Zie `config.md` voor de volledige pinning-strategie.
 
-### Stap 6 — Opleveren
+### Stap 7 — Opleveren
 Lever de output op in het formaat beschreven in de sectie Output format hieronder.
 
 Voeg altijd een korte aantekening toe met de gemaakte keuzes voor tone-of-voice,
@@ -157,8 +170,10 @@ en waarom, en vermeld dit in de aantekeningen bij de oplevering.
 
 ## Referentie
 
-| Bestand               | Gebruik                                                    |
-|-----------------------|------------------------------------------------------------|
-| `config.md`           | Technische limieten, tone-of-voice, B2B-principes, pinning |
-| `examples.md`         | Uitgewerkte RSA-voorbeelden per branche                    |
-| `briefing-template.md`| Verwachte input — stuur terug als briefing incompleet is   |
+| Bestand                               | Gebruik                                                    |
+|---------------------------------------|------------------------------------------------------------|
+| `/clients/[klantnaam]/client-info.md` | Klantprofiel — altijd als eerste lezen                     |
+| `config.md`                           | Technische limieten, tone-of-voice, B2B-principes, pinning |
+| `examples.md`                         | Uitgewerkte RSA-voorbeelden per branche                    |
+| `bad-examples.md`                     | Wat nooit mag — gebruik als controle vóór oplevering       |
+| `briefing-template.md`                | Verwachte input — stuur terug als briefing incompleet is   |
