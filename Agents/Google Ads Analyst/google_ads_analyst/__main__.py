@@ -24,17 +24,19 @@ from __future__ import annotations
 
 import argparse
 import sys
+import webbrowser
+from datetime import datetime
 from pathlib import Path
 
 try:
     from rich.console import Console
-    from rich.markdown import Markdown
     _HAS_RICH = True
 except ImportError:
     _HAS_RICH = False
 
 from .config import Config
 from .tools.excel_parser import parse_files, validate
+from .tools.html_renderer import render_html
 from .agent import run_analysis
 
 
@@ -45,13 +47,6 @@ def _print(text: str, style: str = "") -> None:
             console.print(text, style=style)
         else:
             console.print(text)
-    else:
-        print(text)
-
-
-def _print_markdown(text: str) -> None:
-    if _HAS_RICH:
-        Console().print(Markdown(text))
     else:
         print(text)
 
@@ -158,12 +153,20 @@ def main() -> None:
 
     _print("Analyse uitvoeren...\n", "dim")
     try:
-        report = run_analysis(data, focus=args.focus, data2=data2)
+        sections, tool_results = run_analysis(data, focus=args.focus, data2=data2)
     except Exception as exc:
         _print(f"[red]Fout tijdens analyse: {exc}[/red]")
         sys.exit(1)
 
-    _print_markdown(report)
+    html = render_html(data, tool_results, sections, data2=data2)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"rapport_{timestamp}.html"
+    filepath = Path.cwd() / filename
+    filepath.write_text(html, encoding="utf-8")
+
+    print(f"Rapport opgeslagen: {filename}")
+    webbrowser.open(filepath.as_uri())
 
 
 if __name__ == "__main__":

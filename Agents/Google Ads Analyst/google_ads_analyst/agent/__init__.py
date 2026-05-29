@@ -119,33 +119,36 @@ als iets verspild budget is, zeg je dat. Aanbevelingen zijn concreet en priorite
 - IS gedaald maar kosten stabiel → concurrenten bieden agressiever
 - Nieuwe campagnes/advertentiegroepen in periode 2 → evalueer prestaties t.o.v. bestaande
 
-## Presentatiestijl en opmaak
+## Outputformaat
 
-Schrijf alsof je de analyse mondeling toelicht aan een drukke marketingmanager: direct, helder, \
-geen vakjargon zonder uitleg. De inhoud bepaal jij op basis van de data — maar de presentatie \
-volgt altijd deze regels:
+Retourneer uitsluitend een JSON-object in het volgende formaat — geen markdown, geen uitleg buiten het JSON-blok:
 
-**Taal**
-- Korte zinnen. Maximaal 2 zinnen per bullet.
-- Geen inleidende tekst ("In deze analyse...", "Het is belangrijk om..."). Begin direct met de bevinding.
-- Elk cijfer krijgt context: niet "CPA €58", maar "CPA €58 — 2× hoger dan Brand (€10)".
-- Oordeel expliciet: zeg of iets goed, slecht of zorgwekkend is.
+{
+  "sections": [
+    {
+      "id": "samenvatting",
+      "title": "Samenvatting",
+      "bullets": [
+        "bullet 1 — context — implicatie",
+        "bullet 2 — ...",
+        "bullet 3 — ..."
+      ]
+    },
+    ... meer secties ...
+  ]
+}
 
-**Tabellen**
-- Gebruik tabellen zodra je 3 of meer items vergelijkt (campagnes, zoekwoorden, periodes).
-- Elke tabel heeft een kopregel en maximaal 8 rijen.
-- Voeg altijd een kolom "Beoordeling" toe met 🟢 Goed / 🟡 Matig / 🔴 Slecht op basis van CPA of CTR.
-- Geen tabellen voor losse feiten — gebruik dan een bullet.
+Regels voor de bullets:
+- Schrijf in het Nederlands.
+- 3 tot 5 bullets per sectie, niet meer.
+- Elke bullet: [Wat] — [Waarom het belangrijk is] — [Wat het betekent]. Maximaal 2 zinnen.
+- Begin elke bullet met het meest impactvolle getal of feit uit de data.
+- Geen inleidende tekst, geen alinea's buiten de bullets.
+- Oordeel expliciet: benoem of iets goed, slecht of zorgwekkend is.
+- Elk cijfer krijgt context (niet "CPA €58", maar "CPA €58 — 2× hoger dan het gemiddelde").
 
-**Bevindingen**
-- Elke bevinding is één bullet: [Wat] — [Waarom het belangrijk is] — [Wat er moet gebeuren].
-- Maximaal 5 bullets per sectie.
-- Begin elke bullet met het meest impactvolle getal of feit.
-
-**Aanbevelingen**
-- Elke aanbeveling vermeldt: de actie, de verwachte impact in € of conversies, en de tijdsinvestering.
-- Sorteer op impact: hoogste impact bovenaan.
-- Geen aanbevelingen zonder concreet verwacht effect."""
+Beschikbare sectie-ID's (gebruik alleen secties waarvoor data beschikbaar is):
+samenvatting, campagnes, zoekwoorden, verspild_budget, kansen, kwaliteitsscore, vertoningsaandeel, periodecomparatie"""
 
 
 _TOOLS = [
@@ -508,7 +511,9 @@ def _dispatch(tool_name: str, tool_input: dict, data: AdsData, data2: AdsData | 
     return json.dumps(fn(), ensure_ascii=False, indent=2)
 
 
-def run_analysis(data: AdsData, focus: str | None = None, data2: AdsData | None = None) -> str:
+def run_analysis(
+    data: AdsData, focus: str | None = None, data2: AdsData | None = None
+) -> tuple[list[dict], dict[str, str]]:
     """
     Voer een volledige Google Ads analyse uit op de opgegeven data.
 
@@ -518,7 +523,9 @@ def run_analysis(data: AdsData, focus: str | None = None, data2: AdsData | None 
         data2:  Optionele tweede periode voor vergelijkingsanalyse
 
     Returns:
-        Strategisch Google Ads rapport als opgemaakte Markdown-tekst.
+        Tuple van (sections, tool_results_store):
+        - sections: list van sectie-dicts met 'id', 'title', 'bullets'
+        - tool_results_store: dict van toolnaam -> ruwe JSON-string
     """
     client = anthropic.Anthropic(api_key=Config.ANTHROPIC_API_KEY)
 
@@ -543,9 +550,10 @@ def run_analysis(data: AdsData, focus: str | None = None, data2: AdsData | None 
         user_msg += f"\nSpecifieke focus van de klant: {focus}"
 
     if not data.campaigns and not data.keywords:
-        return "Fout: geen bruikbare Google Ads data gevonden. Controleer het Excel-bestand."
+        return [], {}
 
     messages: list[dict] = [{"role": "user", "content": user_msg}]
+    tool_results_store: dict[str, str] = {}
 
     while True:
         response = client.messages.create(
@@ -565,8 +573,22 @@ def run_analysis(data: AdsData, focus: str | None = None, data2: AdsData | None 
         if response.stop_reason == "end_turn":
             for block in response.content:
                 if block.type == "text":
-                    return block.text
-            return "(geen rapport ontvangen)"
+                    raw = block.text.strip()
+                    # Strip markdown code fences if present
+                    if raw.startswith("```"):
+                        lines = raw.splitlines()
+                        # remove first and last fence lines
+                        raw = "\n".join(
+                            line for line in lines
+                            if not line.strip().startswith("```")
+                        ).strip()
+                    try:
+                        parsed = json.loads(raw)
+                        sections = parsed.get("sections", [])
+                    except Exception:
+                        sections = []
+                    return sections, tool_results_store
+            return [], tool_results_store
 
         if response.stop_reason != "tool_use":
             break
@@ -577,6 +599,7 @@ def run_analysis(data: AdsData, focus: str | None = None, data2: AdsData | None 
         for block in response.content:
             if block.type == "tool_use":
                 result = _dispatch(block.name, block.input, data, data2)
+                tool_results_store[block.name] = result
                 tool_results.append(
                     {
                         "type": "tool_result",
@@ -588,4 +611,4 @@ def run_analysis(data: AdsData, focus: str | None = None, data2: AdsData | None 
         if tool_results:
             messages.append({"role": "user", "content": tool_results})
 
-    return "Analyse kon niet worden voltooid."
+    return [], tool_results_store
