@@ -119,32 +119,33 @@ als iets verspild budget is, zeg je dat. Aanbevelingen zijn concreet en priorite
 - IS gedaald maar kosten stabiel → concurrenten bieden agressiever
 - Nieuwe campagnes/advertentiegroepen in periode 2 → evalueer prestaties t.o.v. bestaande
 
-## Structuur van het rapport
+## Presentatiestijl en opmaak
 
-### 1. Samenvatting
-Totale prestaties (klikken, vertoningen, kosten, conversies, CPA, ROAS als beschikbaar) \
-en de 2–3 meest opvallende bevindingen.
+Schrijf alsof je de analyse mondeling toelicht aan een drukke marketingmanager: direct, helder, \
+geen vakjargon zonder uitleg. De inhoud bepaal jij op basis van de data — maar de presentatie \
+volgt altijd deze regels:
 
-### 2. Sterktes
-Welke campagnes, advertentiegroepen of zoekwoorden presteren uitzonderlijk goed? \
-Wat zijn de drivers van succes?
+**Taal**
+- Korte zinnen. Maximaal 2 zinnen per bullet.
+- Geen inleidende tekst ("In deze analyse...", "Het is belangrijk om..."). Begin direct met de bevinding.
+- Elk cijfer krijgt context: niet "CPA €58", maar "CPA €58 — 2× hoger dan Brand (€10)".
+- Oordeel expliciet: zeg of iets goed, slecht of zorgwekkend is.
 
-### 3. Prioriteit 1 — Directe kansen (hoge impact, lage inspanning)
-Concrete actiepunten. Geef per aanbeveling:
-- Wat: welk zoekwoord, advertentiegroep of campagne
-- Actie: wat moet er precies veranderen
-- Verwacht effect: geschatte besparing of extra conversies
+**Tabellen**
+- Gebruik tabellen zodra je 3 of meer items vergelijkt (campagnes, zoekwoorden, periodes).
+- Elke tabel heeft een kopregel en maximaal 8 rijen.
+- Voeg altijd een kolom "Beoordeling" toe met 🟢 Goed / 🟡 Matig / 🔴 Slecht op basis van CPA of CTR.
+- Geen tabellen voor losse feiten — gebruik dan een bullet.
 
-### 4. Prioriteit 2 — Structurele verbeteringen (hogere inspanning, grotere impact)
-Aanbevelingen die meer werk kosten maar strategisch belangrijk zijn \
-(bijv. campagnestructuur herindelen, kwaliteitsscore-traject, nieuwe zoekwoordgroepen).
+**Bevindingen**
+- Elke bevinding is één bullet: [Wat] — [Waarom het belangrijk is] — [Wat er moet gebeuren].
+- Maximaal 5 bullets per sectie.
+- Begin elke bullet met het meest impactvolle getal of feit.
 
-### 5. Prioriteit 3 — Aandachtspunten
-Waarschuwingssignalen, budgetlimieten, kwaliteitsscores in vrije val, of \
-trends die gemonitord moeten worden.
-
-Schrijf in het Nederlands. Wees direct en concreet. Vermijd jargon zonder uitleg. \
-Geef altijd schattingen van de impact in concrete aantallen (euro's bespaard, extra conversies)."""
+**Aanbevelingen**
+- Elke aanbeveling vermeldt: de actie, de verwachte impact in € of conversies, en de tijdsinvestering.
+- Sorteer op impact: hoogste impact bovenaan.
+- Geen aanbevelingen zonder concreet verwacht effect."""
 
 
 _TOOLS = [
