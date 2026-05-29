@@ -8,7 +8,7 @@ Dit zijn de tools die de agent aan Claude aanbiedt.
 from __future__ import annotations
 
 from collections import defaultdict
-from .excel_parser import AdsData, CampaignRow, AdGroupRow, KeywordRow, SearchTermRow
+from .excel_parser import AdsData, CampaignRow, AdGroupRow, KeywordRow, SearchTermRow, AuctionInsightRow
 
 
 # ---------------------------------------------------------------------------
@@ -25,11 +25,13 @@ def get_overview(data: AdsData) -> dict:
         total_imp = sum(i.impressions for i in items)
         total_cost = round(sum(i.cost for i in items), 2)
         total_conv = round(sum(i.conversions for i in items), 2)
+        total_value = round(sum(getattr(i, "conv_value", 0.0) for i in items), 2)
         avg_ctr = round(total_clicks / total_imp * 100, 2) if total_imp else 0.0
         avg_cpc = round(total_cost / total_clicks, 2) if total_clicks else 0.0
         conv_rate = round(total_conv / total_clicks * 100, 2) if total_clicks else 0.0
         cpa = round(total_cost / total_conv, 2) if total_conv else 0.0
-        return {
+        roas = round(total_value / total_cost, 2) if total_cost and total_value else None
+        out: dict = {
             "label": label,
             "count": len(items),
             "total_clicks": total_clicks,
@@ -41,6 +43,16 @@ def get_overview(data: AdsData) -> dict:
             "conv_rate_pct": conv_rate,
             "cpa_eur": cpa,
         }
+        if total_value:
+            out["total_conv_value_eur"] = total_value
+            out["roas"] = roas
+        # Vertoningsaandeel-gemiddelde (alleen als aanwezig)
+        items_with_is = [i for i in items if getattr(i, "impression_share", 0) > 0]
+        if items_with_is:
+            out["avg_impression_share_pct"] = round(
+                sum(i.impression_share for i in items_with_is) / len(items_with_is), 1
+            )
+        return out
 
     result: dict = {}
     for items, label, key in [
@@ -53,10 +65,14 @@ def get_overview(data: AdsData) -> dict:
         if t:
             result[key] = t
 
+    if data.auction_insights:
+        result["auction_insights_available"] = True
+        result["auction_insight_competitors"] = len(data.auction_insights)
+
     # Gebruik campagnedata als primaire bron voor totalen, anders zoekwoorden
     primary = result.get("campaigns") or result.get("keywords")
     if primary:
-        result["summary"] = {
+        summary: dict = {
             "total_cost_eur": primary["total_cost_eur"],
             "total_clicks": primary["total_clicks"],
             "total_conversions": primary["total_conversions"],
@@ -65,6 +81,12 @@ def get_overview(data: AdsData) -> dict:
             "avg_cpc_eur": primary["avg_cpc_eur"],
             "conv_rate_pct": primary["conv_rate_pct"],
         }
+        if "roas" in primary:
+            summary["roas"] = primary["roas"]
+            summary["total_conv_value_eur"] = primary["total_conv_value_eur"]
+        if "avg_impression_share_pct" in primary:
+            summary["avg_impression_share_pct"] = primary["avg_impression_share_pct"]
+        result["summary"] = summary
 
     return result
 
@@ -658,3 +680,171 @@ def compare_periods(data1: AdsData, data2: AdsData, limit: int = 20) -> dict:
         ]
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Vertoningsaandeel-analyse
+# ---------------------------------------------------------------------------
+
+def get_impression_share_analysis(data: AdsData, limit: int = 20) -> dict:
+    """
+    Analyseert vertoningsaandeel (IS) per campagne en advertentiegroep.
+    Geeft inzicht in hoeveel beschikbaar zoekverkeer je mist, en waarom:
+    door budgetlimiet of door lage ad rank (kwaliteitsscore/bieding).
+    """
+    def _is_rows(items, name_attr: str):
+        with_is = [i for i in items if getattr(i, "impression_share", 0) > 0]
+        if not with_is:
+            return None
+        with_is.sort(key=lambda i: i.impression_share)
+        return [
+            {
+                name_attr: getattr(i, name_attr),
+                "impression_share_pct": i.impression_share,
+                "lost_is_budget_pct": i.lost_is_budget,
+                "lost_is_rank_pct": i.lost_is_rank,
+                "total_lost_pct": round(i.lost_is_budget + i.lost_is_rank, 1),
+                "primary_loss_cause": (
+                    "Budget" if i.lost_is_budget > i.lost_is_rank
+                    else "Ad Rank" if i.lost_is_rank > i.lost_is_budget
+                    else "Gelijk"
+                ) if (i.lost_is_budget + i.lost_is_rank) > 0 else "Geen verlies",
+                "cost_eur": round(i.cost, 2),
+                "conversions": i.conversions,
+            }
+            for i in with_is[:limit]
+        ]
+
+    result: dict = {
+        "note": (
+            "IS-verlies door Budget: verhoog dagelijks budget om meer vertoningen te krijgen. "
+            "IS-verlies door Ad Rank: verbeter kwaliteitsscore of verhoog bieding."
+        ),
+    }
+
+    campaign_rows = _is_rows(data.campaigns, "campaign")
+    ag_rows = _is_rows(data.ad_groups, "ad_group")
+
+    if campaign_rows:
+        result["campaigns"] = campaign_rows
+        budget_loss = sum(r["lost_is_budget_pct"] for r in campaign_rows if r["lost_is_budget_pct"])
+        rank_loss = sum(r["lost_is_rank_pct"] for r in campaign_rows if r["lost_is_rank_pct"])
+        result["campaigns_summary"] = {
+            "primary_loss_cause_overall": "Budget" if budget_loss > rank_loss else "Ad Rank",
+            "avg_impression_share_pct": round(
+                sum(r["impression_share_pct"] for r in campaign_rows) / len(campaign_rows), 1
+            ),
+        }
+    if ag_rows:
+        result["ad_groups"] = ag_rows
+
+    if not campaign_rows and not ag_rows:
+        result["error"] = (
+            "Geen vertoningsaandeel-data beschikbaar. Voeg de kolommen "
+            "'Zoekvertoningsaandeel', 'Zoek verloren VS (budget)' en "
+            "'Zoek verloren VS (rang)' toe aan je campagne- of advertentiegroep-export."
+        )
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# ROAS-analyse
+# ---------------------------------------------------------------------------
+
+def get_roas_analysis(data: AdsData, limit: int = 20) -> dict:
+    """
+    ROAS (Return on Ad Spend) analyse per campagne, advertentiegroep en zoekwoord.
+    Vereist conversiewaarde-data. Identificeert best en slechtst renderende elementen.
+    ROAS = conversiewaarde / kosten. ROAS > 1 = meer waarde dan kosten.
+    """
+    def _roas_rows(items, name_attr: str):
+        with_value = [i for i in items if getattr(i, "conv_value", 0) > 0 and i.cost > 0]
+        if not with_value:
+            return None
+        rows = []
+        for i in with_value:
+            roas = round(i.conv_value / i.cost, 2)
+            rows.append({
+                name_attr: getattr(i, name_attr),
+                "cost_eur": round(i.cost, 2),
+                "conv_value_eur": round(i.conv_value, 2),
+                "roas": roas,
+                "conversions": i.conversions,
+                "cpa_eur": round(i.cost_per_conv, 2) if i.conversions else None,
+            })
+        return rows
+
+    result: dict = {}
+
+    for items, key, attr in [
+        (data.campaigns, "campaigns", "campaign"),
+        (data.ad_groups, "ad_groups", "ad_group"),
+        (data.keywords, "keywords", "keyword"),
+    ]:
+        rows = _roas_rows(items, attr)
+        if rows:
+            rows_sorted = sorted(rows, key=lambda r: r["roas"], reverse=True)
+            result[key] = {
+                "best_roas": rows_sorted[:limit],
+                "worst_roas": rows_sorted[-limit:][::-1],
+                "avg_roas": round(sum(r["roas"] for r in rows) / len(rows), 2),
+                "total_conv_value_eur": round(sum(r["conv_value_eur"] for r in rows), 2),
+                "total_cost_eur": round(sum(r["cost_eur"] for r in rows), 2),
+            }
+
+    if not result:
+        result["error"] = (
+            "Geen conversiewaarde-data beschikbaar. Voeg de kolom 'Conversiewaarde' of "
+            "'All conv. value' toe aan je export, en zorg dat conversiewaarden zijn ingesteld in Google Ads."
+        )
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Veilinginzichten (Auction Insights)
+# ---------------------------------------------------------------------------
+
+def get_auction_insights(data: AdsData, limit: int = 20) -> dict:
+    """
+    Analyseert veilinginzichten: concurrenten, hun vertoningsaandeel, overlap,
+    en hoe vaak zij boven jou staan. Helpt bij het prioriteren van biedingsverhogingen
+    en het identificeren van de sterkste concurrenten.
+    """
+    if not data.auction_insights:
+        return {
+            "error": (
+                "Geen veilinginzichten beschikbaar. Exporteer het rapport via: "
+                "Google Ads > Campagnes (of Advertentiegroepen) > "
+                "klik op het menu 'Veilinginzichten' boven de tabel > Exporteren."
+            )
+        }
+
+    insights = sorted(data.auction_insights, key=lambda a: a.impression_share, reverse=True)
+
+    return {
+        "competitor_count": len(insights),
+        "note": (
+            "Vertoningsaandeel = hoe vaak concurrent in veiling verschijnt. "
+            "Percentage hogere positie = hoe vaak concurrent BOVEN jou staat als jullie beiden verschijnen. "
+            "Percentage hoger gerangschikt = hoe vaak JIJ boven de concurrent staat."
+        ),
+        "competitors": [
+            {
+                "competitor": a.competitor,
+                "impression_share_pct": a.impression_share,
+                "overlap_rate_pct": a.overlap_rate,
+                "position_above_rate_pct": a.position_above_rate,
+                "top_of_page_rate_pct": a.top_of_page_rate,
+                "abs_top_of_page_rate_pct": a.abs_top_of_page_rate,
+                "outranking_share_pct": a.outranking_share,
+                "threat_level": (
+                    "Hoog" if a.impression_share > 60 and a.position_above_rate > 50
+                    else "Gemiddeld" if a.impression_share > 30
+                    else "Laag"
+                ),
+            }
+            for a in insights[:limit]
+        ],
+    }

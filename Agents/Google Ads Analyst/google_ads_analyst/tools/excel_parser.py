@@ -47,6 +47,10 @@ class CampaignRow:
     conv_rate: float    # percentage
     cost_per_conv: float
     budget: float = 0.0
+    conv_value: float = 0.0      # conversiewaarde (€)
+    impression_share: float = 0.0       # vertoningsaandeel (%)
+    lost_is_budget: float = 0.0         # IS-verlies door budget (%)
+    lost_is_rank: float = 0.0           # IS-verlies door ad rank (%)
 
 
 @dataclass
@@ -61,6 +65,10 @@ class AdGroupRow:
     conversions: float
     conv_rate: float
     cost_per_conv: float
+    conv_value: float = 0.0
+    impression_share: float = 0.0
+    lost_is_budget: float = 0.0
+    lost_is_rank: float = 0.0
 
 
 @dataclass
@@ -77,7 +85,11 @@ class KeywordRow:
     conversions: float
     conv_rate: float
     cost_per_conv: float
-    quality_score: int = 0   # 0 = niet beschikbaar
+    quality_score: int = 0
+    conv_value: float = 0.0
+    impression_share: float = 0.0
+    lost_is_budget: float = 0.0
+    lost_is_rank: float = 0.0
 
 
 @dataclass
@@ -95,6 +107,21 @@ class SearchTermRow:
     conversions: float
     conv_rate: float
     cost_per_conv: float
+    conv_value: float = 0.0
+
+
+@dataclass
+class AuctionInsightRow:
+    """Rij uit het veilinginzichten-rapport."""
+    competitor: str          # domeinnaam concurrent
+    impression_share: float  # vertoningsaandeel concurrent (%)
+    overlap_rate: float      # overlap rate (%)
+    position_above_rate: float  # hoe vaak concurrent boven jou staat (%)
+    top_of_page_rate: float  # % vertoningen bovenaan pagina
+    abs_top_of_page_rate: float  # % vertoningen op absolute toppositie
+    outranking_share: float  # hoe vaak jij boven concurrent staat (%)
+    campaign: str = ""
+    ad_group: str = ""
 
 
 @dataclass
@@ -104,6 +131,7 @@ class AdsData:
     ad_groups: list[AdGroupRow]
     keywords: list[KeywordRow]
     search_terms: list[SearchTermRow]
+    auction_insights: list[AuctionInsightRow]
     source_files: list[str]
 
 
@@ -168,6 +196,44 @@ _COL_MAP = {
     "budget": "budget",
     "daily budget": "budget",
     "dagelijks budget": "budget",
+    # Conversiewaarde / ROAS
+    "conversion value": "conv_value",
+    "conversiewaarde": "conv_value",
+    "conv. value": "conv_value",
+    "all conv. value": "conv_value",
+    "alle conv.waarde": "conv_value",
+    "value": "conv_value",
+    # Vertoningsaandeel
+    "search impr. share": "impression_share",
+    "zoekvertoningsaandeel": "impression_share",
+    "impr. share": "impression_share",
+    "vertoningsaandeel": "impression_share",
+    "impression share": "impression_share",
+    "search impression share": "impression_share",
+    # IS-verlies budget
+    "search lost is (budget)": "lost_is_budget",
+    "search lost impr. share (budget)": "lost_is_budget",
+    "zoek verloren vs. (budget)": "lost_is_budget",
+    "lost is (budget)": "lost_is_budget",
+    # IS-verlies rank
+    "search lost is (rank)": "lost_is_rank",
+    "search lost impr. share (rank)": "lost_is_rank",
+    "zoek verloren vs. (rang)": "lost_is_rank",
+    "lost is (rank)": "lost_is_rank",
+    # Auction Insights kolommen
+    "display url domain": "competitor",
+    "domein": "competitor",
+    "competitor": "competitor",
+    "overlap rate": "overlap_rate",
+    "overlappingspercentage": "overlap_rate",
+    "position above rate": "position_above_rate",
+    "percentage hogere positie": "position_above_rate",
+    "top of page rate": "top_of_page_rate",
+    "percentage bovenaan pagina": "top_of_page_rate",
+    "abs. top of page rate": "abs_top_of_page_rate",
+    "percentage absolute toppositie": "abs_top_of_page_rate",
+    "outranking share": "outranking_share",
+    "percentage hoger gerangschikt": "outranking_share",
 }
 
 
@@ -232,7 +298,7 @@ def _rows_from_sheet(sheet) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def _detect_sheet_type(rows: list[dict]) -> str:
-    """Geeft 'campaigns', 'ad_groups', 'keywords', 'search_terms', of 'unknown'."""
+    """Geeft 'campaigns', 'ad_groups', 'keywords', 'search_terms', 'auction_insights', of 'unknown'."""
     if not rows:
         return "unknown"
     keys = set(rows[0].keys())
@@ -240,7 +306,10 @@ def _detect_sheet_type(rows: list[dict]) -> str:
     has_keyword = "keyword" in keys
     has_ad_group = "ad_group" in keys
     has_campaign = "campaign" in keys
+    has_competitor = "competitor" in keys
 
+    if has_competitor:
+        return "auction_insights"
     if has_search_term:
         return "search_terms"
     if has_keyword:
@@ -255,6 +324,14 @@ def _detect_sheet_type(rows: list[dict]) -> str:
 # ---------------------------------------------------------------------------
 # Rijen omzetten naar dataclasses
 # ---------------------------------------------------------------------------
+
+def _parse_is(value) -> float:
+    """Vertoningsaandeel: kan '--' zijn als data ontbreekt, anders % of decimaal."""
+    v = str(value).strip()
+    if v in ("--", "-", ""):
+        return 0.0
+    return _parse_ctr(v)
+
 
 def _to_campaign_rows(rows: list[dict]) -> list[CampaignRow]:
     result = []
@@ -271,6 +348,10 @@ def _to_campaign_rows(rows: list[dict]) -> list[CampaignRow]:
                 conv_rate=_parse_pct(r.get("conv_rate", "0")),
                 cost_per_conv=_parse_float(r.get("cost_per_conv", "0")),
                 budget=_parse_float(r.get("budget", "0")),
+                conv_value=_parse_float(r.get("conv_value", "0")),
+                impression_share=_parse_is(r.get("impression_share", "0")),
+                lost_is_budget=_parse_is(r.get("lost_is_budget", "0")),
+                lost_is_rank=_parse_is(r.get("lost_is_rank", "0")),
             ))
         except (ValueError, TypeError):
             continue
@@ -292,6 +373,10 @@ def _to_ad_group_rows(rows: list[dict]) -> list[AdGroupRow]:
                 conversions=_parse_float(r.get("conversions", "0")),
                 conv_rate=_parse_pct(r.get("conv_rate", "0")),
                 cost_per_conv=_parse_float(r.get("cost_per_conv", "0")),
+                conv_value=_parse_float(r.get("conv_value", "0")),
+                impression_share=_parse_is(r.get("impression_share", "0")),
+                lost_is_budget=_parse_is(r.get("lost_is_budget", "0")),
+                lost_is_rank=_parse_is(r.get("lost_is_rank", "0")),
             ))
         except (ValueError, TypeError):
             continue
@@ -318,6 +403,10 @@ def _to_keyword_rows(rows: list[dict]) -> list[KeywordRow]:
                 conv_rate=_parse_pct(r.get("conv_rate", "0")),
                 cost_per_conv=_parse_float(r.get("cost_per_conv", "0")),
                 quality_score=qs,
+                conv_value=_parse_float(r.get("conv_value", "0")),
+                impression_share=_parse_is(r.get("impression_share", "0")),
+                lost_is_budget=_parse_is(r.get("lost_is_budget", "0")),
+                lost_is_rank=_parse_is(r.get("lost_is_rank", "0")),
             ))
         except (ValueError, TypeError):
             continue
@@ -342,10 +431,31 @@ def _to_search_term_rows(rows: list[dict]) -> list[SearchTermRow]:
                 conversions=_parse_float(r.get("conversions", "0")),
                 conv_rate=_parse_pct(r.get("conv_rate", "0")),
                 cost_per_conv=_parse_float(r.get("cost_per_conv", "0")),
+                conv_value=_parse_float(r.get("conv_value", "0")),
             ))
         except (ValueError, TypeError):
             continue
     return [s for s in result if s.search_term]
+
+
+def _to_auction_insight_rows(rows: list[dict]) -> list[AuctionInsightRow]:
+    result = []
+    for r in rows:
+        try:
+            result.append(AuctionInsightRow(
+                competitor=r.get("competitor", "").strip(),
+                impression_share=_parse_is(r.get("impression_share", "0")),
+                overlap_rate=_parse_is(r.get("overlap_rate", "0")),
+                position_above_rate=_parse_is(r.get("position_above_rate", "0")),
+                top_of_page_rate=_parse_is(r.get("top_of_page_rate", "0")),
+                abs_top_of_page_rate=_parse_is(r.get("abs_top_of_page_rate", "0")),
+                outranking_share=_parse_is(r.get("outranking_share", "0")),
+                campaign=r.get("campaign", "").strip(),
+                ad_group=r.get("ad_group", "").strip(),
+            ))
+        except (ValueError, TypeError):
+            continue
+    return [a for a in result if a.competitor]
 
 
 # ---------------------------------------------------------------------------
@@ -365,6 +475,7 @@ def parse_file(path: str | Path) -> AdsData:
     ad_groups: list[AdGroupRow] = []
     keywords: list[KeywordRow] = []
     search_terms: list[SearchTermRow] = []
+    auction_insights: list[AuctionInsightRow] = []
 
     if p.suffix.lower() == ".csv":
         rows = _rows_from_csv(p)
@@ -377,6 +488,8 @@ def parse_file(path: str | Path) -> AdsData:
             keywords = _to_keyword_rows(rows)
         elif sheet_type == "search_terms":
             search_terms = _to_search_term_rows(rows)
+        elif sheet_type == "auction_insights":
+            auction_insights = _to_auction_insight_rows(rows)
 
     elif p.suffix.lower() in (".xlsx", ".xls"):
         if not _HAS_OPENPYXL:
@@ -394,6 +507,8 @@ def parse_file(path: str | Path) -> AdsData:
                 keywords.extend(_to_keyword_rows(rows))
             elif sheet_type == "search_terms":
                 search_terms.extend(_to_search_term_rows(rows))
+            elif sheet_type == "auction_insights":
+                auction_insights.extend(_to_auction_insight_rows(rows))
         wb.close()
     else:
         raise ValueError(f"Niet-ondersteund bestandstype: {p.suffix}. Gebruik .csv of .xlsx")
@@ -403,6 +518,7 @@ def parse_file(path: str | Path) -> AdsData:
         ad_groups=ad_groups,
         keywords=keywords,
         search_terms=search_terms,
+        auction_insights=auction_insights,
         source_files=[str(p)],
     )
 
@@ -412,13 +528,14 @@ def parse_files(paths: list[str | Path]) -> AdsData:
     Parseer meerdere Google Ads exportbestanden en combineer ze tot één AdsData object.
     Handig als campagnes, zoekwoorden en zoektermen als aparte exports zijn opgeslagen.
     """
-    combined = AdsData(campaigns=[], ad_groups=[], keywords=[], search_terms=[], source_files=[])
+    combined = AdsData(campaigns=[], ad_groups=[], keywords=[], search_terms=[], auction_insights=[], source_files=[])
     for path in paths:
         data = parse_file(path)
         combined.campaigns.extend(data.campaigns)
         combined.ad_groups.extend(data.ad_groups)
         combined.keywords.extend(data.keywords)
         combined.search_terms.extend(data.search_terms)
+        combined.auction_insights.extend(data.auction_insights)
         combined.source_files.extend(data.source_files)
     return combined
 

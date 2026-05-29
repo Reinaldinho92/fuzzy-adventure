@@ -23,6 +23,9 @@ from ..tools.analysis import (
     get_search_term_opportunities,
     get_negative_keyword_candidates,
     get_budget_analysis,
+    get_impression_share_analysis,
+    get_roas_analysis,
+    get_auction_insights,
     compare_periods,
 )
 
@@ -55,6 +58,13 @@ als iets verspild budget is, zeg je dat. Aanbevelingen zijn concreet en priorite
 **Conversie & CTR:**
 - get_conversion_analysis — conversieratio-analyse per campagne/advertentiegroep/zoekwoord
 - get_ctr_analysis — CTR-analyse en kansen voor advertentieverbetering
+
+**Vertoningsaandeel & concurrentie:**
+- get_impression_share_analysis — IS per campagne/advertentiegroep, verlies door budget vs. ad rank
+- get_auction_insights — concurrenten, hun IS, overlap, en hoe vaak zij boven jou staan
+
+**ROAS & conversiewaarde:**
+- get_roas_analysis — ROAS per campagne/advertentiegroep/zoekwoord (vereist conversiewaarde-tracking)
 
 **Periodeanalyse:**
 - compare_periods — vergelijkt twee tijdsperiodes. Alleen beschikbaar als twee periodes zijn aangeleverd.
@@ -89,10 +99,24 @@ als iets verspild budget is, zeg je dat. Aanbevelingen zijn concreet en priorite
 - Zoektermen met veel klikken/kosten maar geen conversies en duidelijk irrelevant → uitsluitingszoekwoord
 - Match type te breed (BMM/Broad) met veel irrelevante zoektermen → overstappen op Exact/Phrase
 
+**Vertoningsaandeel & concurrentie:**
+- IS < 50% met verlies door Budget → verhoog dagelijks budget (als conversies het rechtvaardigen)
+- IS < 50% met verlies door Ad Rank → verbeter kwaliteitsscore of verhoog bieding
+- IS-verlies door rank > 30%: kwaliteitsscore is de eerste prioriteit, niet bieding
+- Competitor met position_above_rate > 70%: zij domineren structureel — analyseer hun QS en biedstrategie
+- Competitor met overlap > 80%: directe concurrent in elke veiling
+
+**ROAS-beoordeling:**
+- Gebruik ROAS alleen als conversiewaarde is ingesteld (e-commerce of lead-waarde tracking)
+- ROAS < 1: kosten overtreffen opbrengsten — pauze of herstructurering nodig
+- ROAS > 4 voor B2B dienstverlening: uitstekend — opschalen
+- Campagnes zonder conversiewaarde: gebruik CPA als primaire efficiëntie-KPI
+
 **Periodecomparatie:**
 - Klikken -20%+ met stabiele vertoningen → CTR-probleem (advertentieteksten of concurrentie)
 - Kosten +20% maar conversies stabiel → CPC gestegen (biedingsstrategie evalueren)
 - Conversieratio -15%+ → landingspagina of aanbod veranderd, of seizoenseffect
+- IS gedaald maar kosten stabiel → concurrenten bieden agressiever
 - Nieuwe campagnes/advertentiegroepen in periode 2 → evalueer prestaties t.o.v. bestaande
 
 ## Structuur van het rapport
@@ -332,6 +356,51 @@ _TOOLS = [
         },
     },
     {
+        "name": "get_impression_share_analysis",
+        "description": (
+            "Analyseert vertoningsaandeel (IS) per campagne en advertentiegroep. "
+            "Geeft hoeveel IS verloren gaat door budgetlimiet versus lage ad rank. "
+            "Essentieel voor het prioriteren van budgetverhogingen vs. kwaliteitsscoreverbeteringen."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "description": "Max campagnes/advertentiegroepen (standaard 20)"},
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "get_roas_analysis",
+        "description": (
+            "ROAS (Return on Ad Spend) analyse per campagne, advertentiegroep en zoekwoord. "
+            "Vereist dat conversiewaarde is ingesteld. "
+            "Identificeert best en slechtst renderende elementen op basis van omzetrendement."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "description": "Max elementen per categorie (standaard 20)"},
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "get_auction_insights",
+        "description": (
+            "Veilinginzichten: concurrenten en hun vertoningsaandeel, overlappingspercentage, "
+            "hoe vaak zij boven jou staan, en hoe vaak jij boven hen staat. "
+            "Helpt bij het identificeren van de sterkste concurrenten en prioriteren van biedingen."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "description": "Max concurrenten (standaard 20)"},
+            },
+            "required": [],
+        },
+    },
+    {
         "name": "compare_periods",
         "description": (
             "Vergelijkt twee tijdsperiodes op campagne-, advertentiegroep- en zoekwoordniveau. "
@@ -414,6 +483,18 @@ def _dispatch(tool_name: str, tool_input: dict, data: AdsData, data2: AdsData | 
             data,
             limit=int(tool_input.get("limit", 20)),
         ),
+        "get_impression_share_analysis": lambda: get_impression_share_analysis(
+            data,
+            limit=int(tool_input.get("limit", 20)),
+        ),
+        "get_roas_analysis": lambda: get_roas_analysis(
+            data,
+            limit=int(tool_input.get("limit", 20)),
+        ),
+        "get_auction_insights": lambda: get_auction_insights(
+            data,
+            limit=int(tool_input.get("limit", 20)),
+        ),
         "compare_periods": lambda: (
             compare_periods(data, data2, limit=int(tool_input.get("limit", 20)))
             if data2 is not None
@@ -447,6 +528,7 @@ def run_analysis(data: AdsData, focus: str | None = None, data2: AdsData | None 
             f"  - Advertentiegroepen: {len(d.ad_groups)} rijen\n"
             f"  - Zoekwoorden: {len(d.keywords)} rijen\n"
             f"  - Zoektermen: {len(d.search_terms)} rijen\n"
+            f"  - Veilinginzichten: {len(d.auction_insights)} concurrenten\n"
             f"  - Bronbestanden: {', '.join(d.source_files)}\n"
         )
 
