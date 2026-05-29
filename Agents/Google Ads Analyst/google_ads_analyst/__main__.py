@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-import webbrowser
 from datetime import datetime
 from pathlib import Path
 
@@ -160,13 +159,15 @@ def main() -> None:
 
     html = render_html(data, tool_results, sections, data2=data2)
 
+    # Sla op als bestand
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"rapport_{timestamp}.html"
     filepath = Path.cwd() / filename
     filepath.write_text(html, encoding="utf-8")
+    _print(f"Rapport opgeslagen: {filename}", "dim")
 
-    print(f"Rapport opgeslagen: {filename}")
-    webbrowser.open(filepath.as_uri())
+    # Print HTML naar stdout zodat Claude Code het als artifact rendert
+    print(html)
 
 
 if __name__ == "__main__":
