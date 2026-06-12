@@ -194,7 +194,228 @@ Regels voor de bullets:
 - In de secties impactacties, klant_update en monitoring: gebruik altijd het aanbeveling-uitlegformaat met max. 5 uitlegbullets per punt.
 
 Beschikbare sectie-ID's (gebruik alleen secties waarvoor data beschikbaar is):
-samenvatting, impactacties, klant_update, monitoring, campagnes, zoekwoorden, verspild_budget, kansen, kwaliteitsscore, vertoningsaandeel, periodecomparatie"""
+samenvatting, impactacties, klant_update, monitoring, campagnes, zoekwoorden, verspild_budget, kansen, kwaliteitsscore, vertoningsaandeel, periodecomparatie
+
+# Rapportage-uitvoer instructies
+
+## Outputformaat
+
+Na het uitvoeren van alle analysetools genereer je **altijd twee bestanden**:
+
+1. Een **HTML-rapport** (`rapport_[klantnaam]_[periode].html`) met scorekaarten, grafieken en tabellen
+2. Een **Markdown-samenvatting** (`rapport_[klantnaam]_[periode].md`) als tekstversie
+
+Sla beide op in de huidige werkdirectory.
+
+---
+
+## HTML-rapport specificaties
+
+Het HTML-rapport is een zelfstandig bestand (geen externe dependencies behalve Chart.js via CDN) met de volgende vaste secties en onderdelen.
+
+### Vereiste secties (in volgorde)
+
+#### 1. KPI-scorekaartgrid
+Toon **minimaal 8 KPI-kaarten** in een responsive grid (4 kolommen op breed scherm, 2 op smal). Elke kaart bevat:
+- Label (bijv. "Totale kosten", "Conversies", "Gem. CPA", "CTR", "Gem. CPC", "Conv. rate", "Klikken", "Vertoningen")
+- Hoofdwaarde (groot, vetgedrukt)
+- Subwaarde of delta (bijv. "↑ +26,9% vs vorige periode" in groen, "↓ +8% verslechtering" in rood)
+
+Kleurcodering deltas: groen (`#3B6D11` op `#EAF3DE`) voor verbetering, rood (`#A32D2D` op `#FCEBEB`) voor verslechtering, grijs voor neutraal.
+
+#### 2. Maand-op-maand trendgrafiek (Chart.js grouped bar)
+Gegroepeerde staafgrafiek per maand met:
+- Kosten (€) — blauwe staven (`#378ADD`)
+- Conversies — groene staven (`#639922`)
+- Tweede Y-as rechts voor conversies
+
+Label elke staf met de absolute waarde. Voeg een datatabel toe onder de grafiek voor screenreaders.
+
+#### 3. Campagneoverzichtstabel
+Gesorteerd op kosten (hoogste eerst). Kolommen:
+`Campagne | Type | Kosten | Klikken | CTR | Conv. | CVR | CPA | IS | QS | Status`
+
+Kleurcodering CPA-cellen:
+- CPA < 50% van gemiddelde → groene achtergrond
+- CPA 50–150% van gemiddelde → geen opmaak
+- CPA > 150% van gemiddelde → rode achtergrond
+
+QS-cellen: QS 1–3 rood, QS 4–6 geel/amber, QS 7–10 groen. QS "N/A" grijs.
+
+IS-cellen: IS > 80% groen, IS 50–80% amber, IS < 50% rood.
+
+Pauzeerde campagnes krijgen grijze rij en badge "Gepauzeerd".
+
+#### 4. CPA-vergelijkingsgrafiek (horizontale Chart.js bar)
+Horizontale staafgrafiek, gesorteerd van laagste naar hoogste CPA. Voeg een verticale referentielijn toe op het gemiddelde CPA. Kleur staven:
+- Groen: CPA < gemiddelde × 0,75
+- Amber: CPA tussen 0,75× en 1,5× gemiddelde
+- Rood: CPA > 1,5× gemiddelde
+
+#### 5. Zoekwoordprestaties (als zoekwoorddata beschikbaar)
+Tabel gesorteerd op conversies (hoogste eerst). Kolommen:
+`Zoekwoord | Match | Campagne | Kosten | Klikken | CTR | Conv. | CVR | CPA | QS`
+
+Highlight rijen met CVR > 20% in lichtgroen. Highlight Broad match zoekwoorden met QS < 6 in amber.
+
+#### 6. Alertblokken (prioritaire bevindingen)
+Toon de 3–6 meest kritieke bevindingen als gekleurde alertblokken **boven de aanbevelingensecties**:
+- Rood alert (rode linkerrand): kritieke problemen (hoge CPA, lage QS, hoog verspild budget)
+- Amber alert (oranje linkerrand): verbeterkansen
+- Groen alert (groene linkerrand): sterke prestaties om op te schalen
+
+Elk alert bevat: korte titel (vet), één zin toelichting, en een concrete actie.
+
+#### 7. Aanbevelingstabel (prioritering)
+Tabel met alle aanbevelingen:
+`# | Aanbeveling | Impact | Inspanning | Geschatte besparing/winst | Prioriteit-badge`
+
+Prioriteit-badges: rood "Hoog", amber "Middel", grijs "Laag".
+
+#### 8. Performance Max uitsplitsing (als PMax-data beschikbaar)
+Tabel per asset group en kanaal. Kolommen:
+`Asset Group | Kanaal | Kosten | Conv. | CPA | Conv. Waarde | ROAS | Sterkte | Aanbeveling | Prioriteit`
+
+Asset Sterkte kleurcodering: "Uitstekend" groen, "Goed" blauw, "Matig" amber, "Slecht" rood.
+
+#### 9. Periodecomparatie (als twee periodes zijn aangeleverd)
+Tabel met delta's per campagne: kosten Δ, klikken Δ, conversies Δ, CPA-verandering. Pijlen (↑↓) met kleur voor richting.
+
+---
+
+## Technische HTML-vereisten
+
+```html
+<!-- Vaste structuur -->
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Ads Rapport — [Klantnaam] — [Periode]</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    /* Gebruik CSS-variabelen voor kleuren zodat dark mode werkt */
+    :root {
+      --bg: #FFFFFF;
+      --bg-secondary: #F7F6F2;
+      --text: #1A1915;
+      --text-secondary: #5F5E5A;
+      --border: #E8E6DF;
+      --green-bg: #EAF3DE; --green-text: #3B6D11;
+      --red-bg: #FCEBEB;   --red-text: #A32D2D;
+      --amber-bg: #FAEEDA; --amber-text: #854F0B;
+      --blue-bg: #E6F1FB;  --blue-text: #185FA5;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1A1915; --bg-secondary: #242320;
+        --text: #F0EFE9; --text-secondary: #9C9A94;
+        --border: #333128;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           background: var(--bg); color: var(--text); padding: 2rem; }
+    .container { max-width: 900px; margin: 0 auto; }
+  </style>
+</head>
+```
+
+**Chart.js configuratie (dark mode aware):**
+```javascript
+const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+const textColor = isDark ? '#9C9A94' : '#5F5E5A';
+
+// Gebruik altijd deze defaults
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.color = textColor;
+```
+
+**Tabelstijlen:**
+```css
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th { text-align: left; padding: 7px 10px; font-weight: 500; font-size: 12px;
+          color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+.tbl td { padding: 7px 10px; border-bottom: 1px solid var(--border); }
+.tbl tr:last-child td { border-bottom: none; }
+.tbl tr:hover td { background: var(--bg-secondary); }
+```
+
+**Badge-stijlen:**
+```css
+.badge { display: inline-block; font-size: 11px; padding: 2px 8px;
+         border-radius: 4px; font-weight: 500; }
+.badge-red    { background: var(--red-bg);   color: var(--red-text); }
+.badge-green  { background: var(--green-bg); color: var(--green-text); }
+.badge-amber  { background: var(--amber-bg); color: var(--amber-text); }
+.badge-blue   { background: var(--blue-bg);  color: var(--blue-text); }
+.badge-gray   { background: var(--bg-secondary); color: var(--text-secondary); }
+```
+
+**Alert-stijlen:**
+```css
+.alert { border-left: 3px solid; padding: .75rem 1rem;
+         border-radius: 0 6px 6px 0; font-size: 13px; margin-bottom: .75rem; }
+.alert-red   { border-color: #E24B4A; background: var(--red-bg);   color: var(--red-text); }
+.alert-amber { border-color: #EF9F27; background: var(--amber-bg); color: var(--amber-text); }
+.alert-green { border-color: #639922; background: var(--green-bg); color: var(--green-text); }
+```
+
+---
+
+## Gegevenspopulatie
+
+Alle cijfers in het HTML-rapport worden **direct vanuit de tool-resultaten** ingevuld — geen placeholders, geen voorbeelddata. Bereken ontbrekende metrics als volgt:
+- CPA = kosten / conversies (als cost_per_conv ontbreekt)
+- CVR = conversies / klikken × 100
+- ROAS = conversiewaarde / kosten (alleen als conv_value > 0)
+- Delta % = (periode2 − periode1) / periode1 × 100
+
+Formatteer getallen in Nederlandse notatie: punt als duizendtalscheider, komma als decimaalscheider (€1.234,56). Percentages met één decimaal (3,2%).
+
+---
+
+## Voorbeeld tool-aanroepvolgorde voor volledig rapport
+
+Roep altijd de tools in deze volgorde aan voordat je het HTML-rapport genereert:
+
+```
+1. get_overview            → KPI-scorekaarten + samenvatting
+2. get_top_campaigns       → campagnetabel + CPA-grafiek
+3. get_wasted_spend        → rode alertblokken
+4. get_top_keywords        → zoekwoordtabel
+5. get_quality_score_analysis → QS-highlights in tabellen
+6. get_budget_analysis     → IS/budget-badges
+7. get_conversion_analysis → CVR-highlights
+8. get_impression_share_analysis → IS-kolom campagnetabel
+9. get_top_search_terms    (als beschikbaar)
+10. get_search_term_opportunities  (als beschikbaar)
+11. get_negative_keyword_candidates (als beschikbaar)
+12. get_roas_analysis      (als conv_value beschikbaar)
+13. get_auction_insights   (als beschikbaar)
+14. compare_periods        (als twee periodes beschikbaar)
+```
+
+Pas daarna genereer je eerst het HTML-bestand en dan het Markdown-bestand.
+
+---
+
+## Naamgeving outputbestanden
+
+```
+rapport_[klantnaam-lowercase-geen-spaties]_[periode-compact].html
+rapport_[klantnaam-lowercase-geen-spaties]_[periode-compact].md
+
+Voorbeelden:
+  rapport_veriflow_feb-apr2025.html
+  rapport_acmecorp_q1-2025.html
+  rapport_klantx_jan2025.html
+```
+
+Klantnaam haal je uit de data (campagnenamen, bestandsnaam of --focus argument). Als de naam niet bepaalbaar is, gebruik dan "klant"."""
 
 
 _TOOLS = [
