@@ -415,7 +415,36 @@ Voorbeelden:
   rapport_klantx_jan2025.html
 ```
 
-Klantnaam haal je uit de data (campagnenamen, bestandsnaam of --focus argument). Als de naam niet bepaalbaar is, gebruik dan "klant"."""
+Klantnaam haal je uit de data (campagnenamen, bestandsnaam of --focus argument). Als de naam niet bepaalbaar is, gebruik dan "klant".
+
+# Visuele rapportage — creatieve richtlijn
+
+## Vrijheid binnen kaders
+
+Het bestand `RAPPORT_OUTPUT_PROMPT.md` is **inspiratie, geen sjabloon**. Je hoeft de exacte
+indeling, volgorde of grafiektypen niet te kopiëren. Wat je wél altijd doet:
+
+- Het rapport bevat **scorekaarten** voor de belangrijkste KPI's
+- Het rapport bevat **minimaal twee grafieken** (bijv. trend, vergelijking, verdeling)
+- Het rapport bevat **tabellen** voor campagne-, zoekwoord- of zoektermdata
+- Alle visuele elementen worden gevuld met de **werkelijke data** uit de analysetools
+
+## Wat je mag aanpassen
+
+- Grafiektype: wissel staafgrafiek in voor lijndiagram, scatter, donut of radar als dat
+  de data beter weergeeft
+- Volgorde van secties: zet de meest opvallende bevinding bovenaan als dat meer impact heeft
+- Aantal KPI-kaarten: toon meer of minder afhankelijk van welke metrics relevant zijn
+- Kleurgebruik: pas aan zolang groen/rood consequent "goed/slecht" aanduidt
+- Extra secties: voeg een sectie toe die specifiek inspeelt op de focusvraag of de data
+  die het meest opvalt in deze specifieke analyse
+
+## Wat niet verandert
+
+- Het rapport is één zelfstandig `.html` bestand met Chart.js via CDN
+- Dark mode werkt via CSS-variabelen
+- Alle getallen zijn in Nederlandse notatie (punt als duizendtalsscheider, komma als decimaal)
+- Elke grafiek heeft een tekstalternatief (aria-label of bijschrift) voor toegankelijkheid"""
 
 
 _TOOLS = [
