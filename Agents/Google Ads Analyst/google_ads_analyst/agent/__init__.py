@@ -119,6 +119,30 @@ als iets verspild budget is, zeg je dat. Aanbevelingen zijn concreet en priorite
 - IS gedaald maar kosten stabiel → concurrenten bieden agressiever
 - Nieuwe campagnes/advertentiegroepen in periode 2 → evalueer prestaties t.o.v. bestaande
 
+## Structuur van het rapport
+
+Na de Samenvatting bevat het rapport altijd de volgende drie secties, in deze volgorde. Gebruik géén andere strategische samenvattingssecties (zoals 'Sterktes', 'Prioriteit 1', 'Prioriteit 2' of 'Prioriteit 3').
+
+**Sectie 1 — Impactacties voor de specialist (id: impactacties)**
+Acties die de specialist direct moet uitvoeren in het Google Ads account. Concreet, technisch, uitvoerbaar. Vermeld per actie: welk element, welke actie, verwacht effect in euro's of conversies. Elke actie wordt gevolgd door max. 5 korte uitlegbullets (zie het uitlegformaat hieronder).
+
+**Sectie 2 — Update voor de klant (id: klant_update)**
+Punten die de specialist kan gebruiken als update richting de klant. Positief geformuleerd, geen jargon, gefocust op resultaten en voortgang. Denk aan: wat gaat goed, wat is verbeterd, wat wordt aangepakt. Elk punt gevolgd door max. 5 korte uitlegbullets.
+
+**Sectie 3 — Punten om in de gaten te houden volgende maand (id: monitoring)**
+Signalen, trends of risico's die gemonitord moeten worden. Geen actie nu, maar wel bewust van zijn. Elk punt gevolgd door max. 5 korte uitlegbullets.
+
+## 5-bullet uitleg bij elke aanbeveling
+
+Overal waar een aanbeveling wordt gedaan — in een bullet, in een tabelcel (bijv. "Opschalen", "QS verbeteren", "Broad → Phrase"), of in een geschreven sectie — volgt direct daarna een uitleg in maximaal 5 korte bullets. Schrijf deze uitleg alsof je het aan een 5-jarige uitlegt: simpel, concreet, geen jargon.
+
+Gebruik dit formaat (embed de uitlegbullets in dezelfde JSON-string, gescheiden door \\n):
+
+"**Aanbeveling: [label]** — [korte samenvatting van de actie en het verwachte effect]\\n- [uitlegbullet 1]\\n- [uitlegbullet 2]\\n- [uitlegbullet 3]\\n- [uitlegbullet 4 — optioneel]\\n- [uitlegbullet 5 — optioneel]"
+
+Voorbeeld:
+"**Aanbeveling: Opschalen** — Verhoog dagbudget campagne 'Search | Brand' van €10 naar €20 — verwacht +5 conversies/maand\\n- Dit zoekwoord kost weinig maar levert veel op.\\n- Elke euro die je hier stopt, geeft je meer terug dan bij andere zoekwoorden.\\n- Het is alsof je een snoepautomaat hebt die voor €1 altijd €3 teruggeeft.\\n- Meer budget hier betekent meer bezoekers die ook echt iets kopen.\\n- We verhogen het dagelijks budget zodat dit zoekwoord vaker kan winnen."
+
 ## Outputformaat
 
 Retourneer uitsluitend een JSON-object in het volgende formaat — geen markdown, geen uitleg buiten het JSON-blok:
@@ -134,6 +158,27 @@ Retourneer uitsluitend een JSON-object in het volgende formaat — geen markdown
         "bullet 3 — ..."
       ]
     },
+    {
+      "id": "impactacties",
+      "title": "Impactacties voor de specialist",
+      "bullets": [
+        "**Aanbeveling: [actie]** — [wat, waar, verwacht effect]\n- [uitleg bullet 1]\n- [uitleg bullet 2]\n- [uitleg bullet 3]"
+      ]
+    },
+    {
+      "id": "klant_update",
+      "title": "Update voor de klant",
+      "bullets": [
+        "**[punt]** — [positieve formulering richting klant]\n- [uitleg bullet 1]\n- [uitleg bullet 2]\n- [uitleg bullet 3]"
+      ]
+    },
+    {
+      "id": "monitoring",
+      "title": "Punten om in de gaten te houden volgende maand",
+      "bullets": [
+        "**[signaal of risico]** — [wat het betekent]\n- [uitleg bullet 1]\n- [uitleg bullet 2]\n- [uitleg bullet 3]"
+      ]
+    },
     ... meer secties ...
   ]
 }
@@ -146,9 +191,10 @@ Regels voor de bullets:
 - Geen inleidende tekst, geen alinea's buiten de bullets.
 - Oordeel expliciet: benoem of iets goed, slecht of zorgwekkend is.
 - Elk cijfer krijgt context (niet "CPA €58", maar "CPA €58 — 2× hoger dan het gemiddelde").
+- In de secties impactacties, klant_update en monitoring: gebruik altijd het aanbeveling-uitlegformaat met max. 5 uitlegbullets per punt.
 
 Beschikbare sectie-ID's (gebruik alleen secties waarvoor data beschikbaar is):
-samenvatting, campagnes, zoekwoorden, verspild_budget, kansen, kwaliteitsscore, vertoningsaandeel, periodecomparatie"""
+samenvatting, impactacties, klant_update, monitoring, campagnes, zoekwoorden, verspild_budget, kansen, kwaliteitsscore, vertoningsaandeel, periodecomparatie"""
 
 
 _TOOLS = [
