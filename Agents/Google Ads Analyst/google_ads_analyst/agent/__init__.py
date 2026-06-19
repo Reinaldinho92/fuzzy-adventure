@@ -1,11 +1,13 @@
 """
 Google Ads Analyse Agent.
-Claude analyseert Google Ads exportdata via tool use en levert een strategisch rapport.
+Claude analyseert Google Ads exportdata via tool use en genereert een volledig HTML-rapport.
 """
 
 from __future__ import annotations
 
 import json
+import pathlib
+
 import anthropic
 
 from ..config import Config
@@ -29,8 +31,11 @@ from ..tools.analysis import (
     compare_periods,
 )
 
+_RAPPORT_OUTPUT_PROMPT = (
+    pathlib.Path(__file__).parent.parent / "RAPPORT_OUTPUT_PROMPT.md"
+).read_text(encoding="utf-8")
 
-_SYSTEM_PROMPT = """Je bent een Google Ads analist van Search Signals, een B2B digitaal \
+_SYSTEM_PROMPT_BASE = """Je bent een Google Ads analist van Search Signals, een B2B digitaal \
 marketingbureau. Je helpt klanten hun Google Ads campagnes begrijpen, optimaliseren en \
 laten groeien.
 
@@ -119,332 +124,90 @@ als iets verspild budget is, zeg je dat. Aanbevelingen zijn concreet en priorite
 - IS gedaald maar kosten stabiel → concurrenten bieden agressiever
 - Nieuwe campagnes/advertentiegroepen in periode 2 → evalueer prestaties t.o.v. bestaande
 
-## Structuur van het rapport
+## Secties van het rapport
 
-Na de Samenvatting bevat het rapport altijd de volgende drie secties, in deze volgorde. Gebruik géén andere strategische samenvattingssecties (zoals 'Sterktes', 'Prioriteit 1', 'Prioriteit 2' of 'Prioriteit 3').
+Het rapport bevat altijd de volgende vier hoofdsecties. Elke sectie is een `<section id="...">` \
+element met een `<h2>` koptekst.
 
-**Sectie 1 — Impactacties voor de specialist (id: impactacties)**
-Acties die de specialist direct moet uitvoeren in het Google Ads account. Concreet, technisch, uitvoerbaar. Vermeld per actie: welk element, welke actie, verwacht effect in euro's of conversies. Elke actie wordt gevolgd door max. 5 korte uitlegbullets (zie het uitlegformaat hieronder).
+**Samenvatting (id: samenvatting)**
+Toon eerst de KPI-scorekaarten (`.stat-cards` grid). Geef daarna 3–5 meest opvallende bevindingen \
+als `.bullets` lijst. Begin elke bullet met het meest impactvolle getal of feit.
 
-**Sectie 2 — Update voor de klant (id: klant_update)**
-Punten die de specialist kan gebruiken als update richting de klant. Positief geformuleerd, geen jargon, gefocust op resultaten en voortgang. Denk aan: wat gaat goed, wat is verbeterd, wat wordt aangepakt. Elk punt gevolgd door max. 5 korte uitlegbullets.
+**Impactacties voor de specialist (id: impactacties)**
+Acties die de specialist direct moet uitvoeren in het Google Ads account. Concreet, technisch, \
+uitvoerbaar. Per actie: welk element, welke actie, verwacht effect in euro's of conversies. \
+Elk actiepunt gevolgd door max. 5 korte uitlegbullets in `<ul class="uitleg-bullets">`.
 
-**Sectie 3 — Punten om in de gaten te houden volgende maand (id: monitoring)**
-Signalen, trends of risico's die gemonitord moeten worden. Geen actie nu, maar wel bewust van zijn. Elk punt gevolgd door max. 5 korte uitlegbullets.
+**Update voor de klant (id: klant_update)**
+Punten die de specialist kan gebruiken als update richting de klant. Positief geformuleerd, geen \
+jargon, gefocust op resultaten en voortgang. Elk punt gevolgd door max. 5 uitlegbullets.
 
-## 5-bullet uitleg bij elke aanbeveling
+**Punten om in de gaten te houden volgende maand (id: monitoring)**
+Signalen, trends of risico's die gemonitord moeten worden. Geen actie nu, maar wel bewust van zijn. \
+Elk punt gevolgd door max. 5 uitlegbullets.
 
-Overal waar een aanbeveling wordt gedaan — in een bullet, in een tabelcel (bijv. "Opschalen", "QS verbeteren", "Broad → Phrase"), of in een geschreven sectie — volgt direct daarna een uitleg in maximaal 5 korte bullets. Schrijf deze uitleg alsof je het aan een 5-jarige uitlegt: simpel, concreet, geen jargon.
+Naast deze vier secties voeg je optionele secties toe op basis van beschikbare data: \
+campagnes, zoekwoorden, verspild_budget, kansen, kwaliteitsscore, vertoningsaandeel, periodecomparatie.
 
-Gebruik dit formaat (embed de uitlegbullets in dezelfde JSON-string, gescheiden door \\n):
+## Uitleg bij aanbevelingen
 
-"**Aanbeveling: [label]** — [korte samenvatting van de actie en het verwachte effect]\\n- [uitlegbullet 1]\\n- [uitlegbullet 2]\\n- [uitlegbullet 3]\\n- [uitlegbullet 4 — optioneel]\\n- [uitlegbullet 5 — optioneel]"
+Overal waar een aanbeveling wordt gedaan, volgt direct daarna een uitleg in maximaal 5 korte \
+bullets — alsof je het aan een 5-jarige uitlegt: simpel, concreet, geen jargon. \
+Gebruik `<ul class="uitleg-bullets">` voor de uitlegbullets.
 
-Voorbeeld:
-"**Aanbeveling: Opschalen** — Verhoog dagbudget campagne 'Search | Brand' van €10 naar €20 — verwacht +5 conversies/maand\\n- Dit zoekwoord kost weinig maar levert veel op.\\n- Elke euro die je hier stopt, geeft je meer terug dan bij andere zoekwoorden.\\n- Het is alsof je een snoepautomaat hebt die voor €1 altijd €3 teruggeeft.\\n- Meer budget hier betekent meer bezoekers die ook echt iets kopen.\\n- We verhogen het dagelijks budget zodat dit zoekwoord vaker kan winnen."
+Richtlijnen:
+- Schrijf altijd in het Nederlands
+- Begin met het meest impactvolle getal of feit
+- Oordeel expliciet: goed, slecht of zorgwekkend
+- Elk cijfer krijgt context (niet "CPA €58", maar "CPA €58 — 2× hoger dan het gemiddelde")
+- 3 tot 5 bullets per strategische sectie, niet meer
 
-## Outputformaat
+## Aanbevolen tool-aanroepvolgorde
 
-Retourneer uitsluitend een JSON-object in het volgende formaat — geen markdown, geen uitleg buiten het JSON-blok:
+Roep tools in deze volgorde aan voordat je het HTML-rapport genereert:
 
-{
-  "sections": [
-    {
-      "id": "samenvatting",
-      "title": "Samenvatting",
-      "bullets": [
-        "bullet 1 — context — implicatie",
-        "bullet 2 — ...",
-        "bullet 3 — ..."
-      ]
-    },
-    {
-      "id": "impactacties",
-      "title": "Impactacties voor de specialist",
-      "bullets": [
-        "**Aanbeveling: [actie]** — [wat, waar, verwacht effect]\n- [uitleg bullet 1]\n- [uitleg bullet 2]\n- [uitleg bullet 3]"
-      ]
-    },
-    {
-      "id": "klant_update",
-      "title": "Update voor de klant",
-      "bullets": [
-        "**[punt]** — [positieve formulering richting klant]\n- [uitleg bullet 1]\n- [uitleg bullet 2]\n- [uitleg bullet 3]"
-      ]
-    },
-    {
-      "id": "monitoring",
-      "title": "Punten om in de gaten te houden volgende maand",
-      "bullets": [
-        "**[signaal of risico]** — [wat het betekent]\n- [uitleg bullet 1]\n- [uitleg bullet 2]\n- [uitleg bullet 3]"
-      ]
-    },
-    ... meer secties ...
-  ]
-}
-
-Regels voor de bullets:
-- Schrijf in het Nederlands.
-- 3 tot 5 bullets per sectie, niet meer.
-- Elke bullet: [Wat] — [Waarom het belangrijk is] — [Wat het betekent]. Maximaal 2 zinnen.
-- Begin elke bullet met het meest impactvolle getal of feit uit de data.
-- Geen inleidende tekst, geen alinea's buiten de bullets.
-- Oordeel expliciet: benoem of iets goed, slecht of zorgwekkend is.
-- Elk cijfer krijgt context (niet "CPA €58", maar "CPA €58 — 2× hoger dan het gemiddelde").
-- In de secties impactacties, klant_update en monitoring: gebruik altijd het aanbeveling-uitlegformaat met max. 5 uitlegbullets per punt.
-
-Beschikbare sectie-ID's (gebruik alleen secties waarvoor data beschikbaar is):
-samenvatting, impactacties, klant_update, monitoring, campagnes, zoekwoorden, verspild_budget, kansen, kwaliteitsscore, vertoningsaandeel, periodecomparatie
-
-# Rapportage-uitvoer instructies
-
-## Outputformaat
-
-Na het uitvoeren van alle analysetools genereer je **altijd twee bestanden**:
-
-1. Een **HTML-rapport** (`rapport_[klantnaam]_[periode].html`) met scorekaarten, grafieken en tabellen
-2. Een **Markdown-samenvatting** (`rapport_[klantnaam]_[periode].md`) als tekstversie
-
-Sla beide op in de huidige werkdirectory.
-
----
-
-## HTML-rapport specificaties
-
-Het HTML-rapport is een zelfstandig bestand (geen externe dependencies behalve Chart.js via CDN) met de volgende vaste secties en onderdelen.
-
-### Vereiste secties (in volgorde)
-
-#### 1. KPI-scorekaartgrid
-Toon **minimaal 8 KPI-kaarten** in een responsive grid (4 kolommen op breed scherm, 2 op smal). Elke kaart bevat:
-- Label (bijv. "Totale kosten", "Conversies", "Gem. CPA", "CTR", "Gem. CPC", "Conv. rate", "Klikken", "Vertoningen")
-- Hoofdwaarde (groot, vetgedrukt)
-- Subwaarde of delta (bijv. "↑ +26,9% vs vorige periode" in groen, "↓ +8% verslechtering" in rood)
-
-Kleurcodering deltas: groen (`#3B6D11` op `#EAF3DE`) voor verbetering, rood (`#A32D2D` op `#FCEBEB`) voor verslechtering, grijs voor neutraal.
-
-#### 2. Maand-op-maand trendgrafiek (Chart.js grouped bar)
-Gegroepeerde staafgrafiek per maand met:
-- Kosten (€) — blauwe staven (`#378ADD`)
-- Conversies — groene staven (`#639922`)
-- Tweede Y-as rechts voor conversies
-
-Label elke staf met de absolute waarde. Voeg een datatabel toe onder de grafiek voor screenreaders.
-
-#### 3. Campagneoverzichtstabel
-Gesorteerd op kosten (hoogste eerst). Kolommen:
-`Campagne | Type | Kosten | Klikken | CTR | Conv. | CVR | CPA | IS | QS | Status`
-
-Kleurcodering CPA-cellen:
-- CPA < 50% van gemiddelde → groene achtergrond
-- CPA 50–150% van gemiddelde → geen opmaak
-- CPA > 150% van gemiddelde → rode achtergrond
-
-QS-cellen: QS 1–3 rood, QS 4–6 geel/amber, QS 7–10 groen. QS "N/A" grijs.
-
-IS-cellen: IS > 80% groen, IS 50–80% amber, IS < 50% rood.
-
-Pauzeerde campagnes krijgen grijze rij en badge "Gepauzeerd".
-
-#### 4. CPA-vergelijkingsgrafiek (horizontale Chart.js bar)
-Horizontale staafgrafiek, gesorteerd van laagste naar hoogste CPA. Voeg een verticale referentielijn toe op het gemiddelde CPA. Kleur staven:
-- Groen: CPA < gemiddelde × 0,75
-- Amber: CPA tussen 0,75× en 1,5× gemiddelde
-- Rood: CPA > 1,5× gemiddelde
-
-#### 5. Zoekwoordprestaties (als zoekwoorddata beschikbaar)
-Tabel gesorteerd op conversies (hoogste eerst). Kolommen:
-`Zoekwoord | Match | Campagne | Kosten | Klikken | CTR | Conv. | CVR | CPA | QS`
-
-Highlight rijen met CVR > 20% in lichtgroen. Highlight Broad match zoekwoorden met QS < 6 in amber.
-
-#### 6. Alertblokken (prioritaire bevindingen)
-Toon de 3–6 meest kritieke bevindingen als gekleurde alertblokken **boven de aanbevelingensecties**:
-- Rood alert (rode linkerrand): kritieke problemen (hoge CPA, lage QS, hoog verspild budget)
-- Amber alert (oranje linkerrand): verbeterkansen
-- Groen alert (groene linkerrand): sterke prestaties om op te schalen
-
-Elk alert bevat: korte titel (vet), één zin toelichting, en een concrete actie.
-
-#### 7. Aanbevelingstabel (prioritering)
-Tabel met alle aanbevelingen:
-`# | Aanbeveling | Impact | Inspanning | Geschatte besparing/winst | Prioriteit-badge`
-
-Prioriteit-badges: rood "Hoog", amber "Middel", grijs "Laag".
-
-#### 8. Performance Max uitsplitsing (als PMax-data beschikbaar)
-Tabel per asset group en kanaal. Kolommen:
-`Asset Group | Kanaal | Kosten | Conv. | CPA | Conv. Waarde | ROAS | Sterkte | Aanbeveling | Prioriteit`
-
-Asset Sterkte kleurcodering: "Uitstekend" groen, "Goed" blauw, "Matig" amber, "Slecht" rood.
-
-#### 9. Periodecomparatie (als twee periodes zijn aangeleverd)
-Tabel met delta's per campagne: kosten Δ, klikken Δ, conversies Δ, CPA-verandering. Pijlen (↑↓) met kleur voor richting.
-
----
-
-## Technische HTML-vereisten
-
-```html
-<!-- Vaste structuur -->
-<!DOCTYPE html>
-<html lang="nl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Google Ads Rapport — [Klantnaam] — [Periode]</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-  <style>
-    /* Gebruik CSS-variabelen voor kleuren zodat dark mode werkt */
-    :root {
-      --bg: #FFFFFF;
-      --bg-secondary: #F7F6F2;
-      --text: #1A1915;
-      --text-secondary: #5F5E5A;
-      --border: #E8E6DF;
-      --green-bg: #EAF3DE; --green-text: #3B6D11;
-      --red-bg: #FCEBEB;   --red-text: #A32D2D;
-      --amber-bg: #FAEEDA; --amber-text: #854F0B;
-      --blue-bg: #E6F1FB;  --blue-text: #185FA5;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #1A1915; --bg-secondary: #242320;
-        --text: #F0EFE9; --text-secondary: #9C9A94;
-        --border: #333128;
-      }
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-           background: var(--bg); color: var(--text); padding: 2rem; }
-    .container { max-width: 900px; margin: 0 auto; }
-  </style>
-</head>
-```
-
-**Chart.js configuratie (dark mode aware):**
-```javascript
-const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
-const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
-const textColor = isDark ? '#9C9A94' : '#5F5E5A';
-
-// Gebruik altijd deze defaults
-Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-Chart.defaults.font.size = 12;
-Chart.defaults.color = textColor;
-```
-
-**Tabelstijlen:**
-```css
-.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-.tbl th { text-align: left; padding: 7px 10px; font-weight: 500; font-size: 12px;
-          color: var(--text-secondary); border-bottom: 1px solid var(--border); }
-.tbl td { padding: 7px 10px; border-bottom: 1px solid var(--border); }
-.tbl tr:last-child td { border-bottom: none; }
-.tbl tr:hover td { background: var(--bg-secondary); }
-```
-
-**Badge-stijlen:**
-```css
-.badge { display: inline-block; font-size: 11px; padding: 2px 8px;
-         border-radius: 4px; font-weight: 500; }
-.badge-red    { background: var(--red-bg);   color: var(--red-text); }
-.badge-green  { background: var(--green-bg); color: var(--green-text); }
-.badge-amber  { background: var(--amber-bg); color: var(--amber-text); }
-.badge-blue   { background: var(--blue-bg);  color: var(--blue-text); }
-.badge-gray   { background: var(--bg-secondary); color: var(--text-secondary); }
-```
-
-**Alert-stijlen:**
-```css
-.alert { border-left: 3px solid; padding: .75rem 1rem;
-         border-radius: 0 6px 6px 0; font-size: 13px; margin-bottom: .75rem; }
-.alert-red   { border-color: #E24B4A; background: var(--red-bg);   color: var(--red-text); }
-.alert-amber { border-color: #EF9F27; background: var(--amber-bg); color: var(--amber-text); }
-.alert-green { border-color: #639922; background: var(--green-bg); color: var(--green-text); }
-```
-
----
-
-## Gegevenspopulatie
-
-Alle cijfers in het HTML-rapport worden **direct vanuit de tool-resultaten** ingevuld — geen placeholders, geen voorbeelddata. Bereken ontbrekende metrics als volgt:
-- CPA = kosten / conversies (als cost_per_conv ontbreekt)
-- CVR = conversies / klikken × 100
-- ROAS = conversiewaarde / kosten (alleen als conv_value > 0)
-- Delta % = (periode2 − periode1) / periode1 × 100
-
-Formatteer getallen in Nederlandse notatie: punt als duizendtalscheider, komma als decimaalscheider (€1.234,56). Percentages met één decimaal (3,2%).
-
----
-
-## Voorbeeld tool-aanroepvolgorde voor volledig rapport
-
-Roep altijd de tools in deze volgorde aan voordat je het HTML-rapport genereert:
-
-```
-1. get_overview            → KPI-scorekaarten + samenvatting
-2. get_top_campaigns       → campagnetabel + CPA-grafiek
-3. get_wasted_spend        → rode alertblokken
-4. get_top_keywords        → zoekwoordtabel
-5. get_quality_score_analysis → QS-highlights in tabellen
-6. get_budget_analysis     → IS/budget-badges
-7. get_conversion_analysis → CVR-highlights
-8. get_impression_share_analysis → IS-kolom campagnetabel
-9. get_top_search_terms    (als beschikbaar)
+1. get_overview                    → KPI-scorekaarten + samenvatting
+2. get_top_campaigns               → campagnetabel + CPA-grafiek
+3. get_wasted_spend                → rode alertblokken
+4. get_top_keywords                → zoekwoordtabel
+5. get_quality_score_analysis      → QS-highlights
+6. get_budget_analysis             → budget-badges
+7. get_conversion_analysis         → CVR-highlights
+8. get_impression_share_analysis   → IS-kolom
+9. get_top_search_terms            (als beschikbaar)
 10. get_search_term_opportunities  (als beschikbaar)
 11. get_negative_keyword_candidates (als beschikbaar)
-12. get_roas_analysis      (als conv_value beschikbaar)
-13. get_auction_insights   (als beschikbaar)
-14. compare_periods        (als twee periodes beschikbaar)
-```
+12. get_roas_analysis              (als conv_value beschikbaar)
+13. get_auction_insights           (als beschikbaar)
+14. compare_periods                (als twee periodes beschikbaar)
 
-Pas daarna genereer je eerst het HTML-bestand en dan het Markdown-bestand.
+## Output
 
----
+Geef als uitvoer **één compleet, zelfstandig HTML-document**. Geen JSON, geen Markdown, geen \
+uitleg buiten de HTML. Het document wordt direct als bestand opgeslagen.
 
-## Naamgeving outputbestanden
+Alle getallen in het rapport komen **uitsluitend** uit de tool-resultaten — nooit uit eigen \
+berekening of schatting.
 
-```
-rapport_[klantnaam-lowercase-geen-spaties]_[periode-compact].html
-rapport_[klantnaam-lowercase-geen-spaties]_[periode-compact].md
+## Visuele rapportage — creatieve richtlijn
 
-Voorbeelden:
-  rapport_veriflow_feb-apr2025.html
-  rapport_acmecorp_q1-2025.html
-  rapport_klantx_jan2025.html
-```
+De CSS, kleuren, scorekaartstructuur en componentstijlen uit RAPPORT_OUTPUT_PROMPT.md hieronder \
+zijn **vast**. Binnen dat kader kies jij:
 
-Klantnaam haal je uit de data (campagnenamen, bestandsnaam of --focus argument). Als de naam niet bepaalbaar is, gebruik dan "klant".
+- **Grafiektype:** wissel staafgrafiek in voor lijndiagram, scatter, donut of radar als dat de \
+  data beter weergeeft
+- **Volgorde van secties:** zet de meest opvallende bevinding bovenaan als dat meer impact heeft
+- **Aantal KPI-kaarten:** toon meer of minder afhankelijk van welke metrics relevant zijn
+- **Extra secties:** voeg een sectie toe die specifiek inspeelt op de focusvraag of de meest \
+  opvallende data
 
-# Visuele rapportage — creatieve richtlijn
-
-## Vrijheid binnen kaders
-
-Het bestand `RAPPORT_OUTPUT_PROMPT.md` is **inspiratie, geen sjabloon**. Je hoeft de exacte
-indeling, volgorde of grafiektypen niet te kopiëren. Wat je wél altijd doet:
-
-- Het rapport bevat **scorekaarten** voor de belangrijkste KPI's
-- Het rapport bevat **minimaal twee grafieken** (bijv. trend, vergelijking, verdeling)
-- Het rapport bevat **tabellen** voor campagne-, zoekwoord- of zoektermdata
-- Alle visuele elementen worden gevuld met de **werkelijke data** uit de analysetools
-
-## Wat je mag aanpassen
-
-- Grafiektype: wissel staafgrafiek in voor lijndiagram, scatter, donut of radar als dat
-  de data beter weergeeft
-- Volgorde van secties: zet de meest opvallende bevinding bovenaan als dat meer impact heeft
-- Aantal KPI-kaarten: toon meer of minder afhankelijk van welke metrics relevant zijn
-- Kleurgebruik: pas aan zolang groen/rood consequent "goed/slecht" aanduidt
-- Extra secties: voeg een sectie toe die specifiek inspeelt op de focusvraag of de data
-  die het meest opvalt in deze specifieke analyse
-
-## Wat niet verandert
-
+Wat niet verandert:
 - Het rapport is één zelfstandig `.html` bestand met Chart.js via CDN
 - Dark mode werkt via CSS-variabelen
-- Alle getallen zijn in Nederlandse notatie (punt als duizendtalsscheider, komma als decimaal)
-- Elke grafiek heeft een tekstalternatief (aria-label of bijschrift) voor toegankelijkheid"""
+- Alle getallen zijn in Nederlandse notatie (punt als duizendtalscheider, komma als decimaal)
+- Elke grafiek heeft een tekstalternatief (`aria-label` op `<canvas>` + `<p class="chart-caption">`)"""
+
+_SYSTEM_PROMPT = _SYSTEM_PROMPT_BASE + "\n\n---\n\n" + _RAPPORT_OUTPUT_PROMPT
 
 
 _TOOLS = [
@@ -809,9 +572,9 @@ def _dispatch(tool_name: str, tool_input: dict, data: AdsData, data2: AdsData | 
 
 def run_analysis(
     data: AdsData, focus: str | None = None, data2: AdsData | None = None
-) -> tuple[list[dict], dict[str, str]]:
+) -> str:
     """
-    Voer een volledige Google Ads analyse uit op de opgegeven data.
+    Voer een volledige Google Ads analyse uit en genereer een HTML-rapport.
 
     Args:
         data:   Geparsede Google Ads data — basisperiode (of enige periode)
@@ -819,9 +582,7 @@ def run_analysis(
         data2:  Optionele tweede periode voor vergelijkingsanalyse
 
     Returns:
-        Tuple van (sections, tool_results_store):
-        - sections: list van sectie-dicts met 'id', 'title', 'bullets'
-        - tool_results_store: dict van toolnaam -> ruwe JSON-string
+        Volledig HTML-document als string
     """
     client = anthropic.Anthropic(api_key=Config.ANTHROPIC_API_KEY)
 
@@ -841,15 +602,14 @@ def run_analysis(
         data_context += "\n" + _summary(data2, "Periode 2 (vergelijking)")
         data_context += "\nVergelijkingsanalyse beschikbaar via de tool compare_periods."
 
-    user_msg = "Analyseer de Google Ads data en maak een strategisch rapport.\n\n" + data_context
+    user_msg = "Analyseer de Google Ads data en maak een strategisch HTML-rapport.\n\n" + data_context
     if focus:
         user_msg += f"\nSpecifieke focus van de klant: {focus}"
 
     if not data.campaigns and not data.keywords:
-        return [], {}
+        return ""
 
     messages: list[dict] = [{"role": "user", "content": user_msg}]
-    tool_results_store: dict[str, str] = {}
 
     while True:
         response = client.messages.create(
@@ -867,24 +627,19 @@ def run_analysis(
         )
 
         if response.stop_reason == "end_turn":
+            html_parts = []
             for block in response.content:
                 if block.type == "text":
-                    raw = block.text.strip()
-                    # Strip markdown code fences if present
-                    if raw.startswith("```"):
-                        lines = raw.splitlines()
-                        # remove first and last fence lines
-                        raw = "\n".join(
-                            line for line in lines
-                            if not line.strip().startswith("```")
-                        ).strip()
-                    try:
-                        parsed = json.loads(raw)
-                        sections = parsed.get("sections", [])
-                    except Exception:
-                        sections = []
-                    return sections, tool_results_store
-            return [], tool_results_store
+                    html_parts.append(block.text)
+            raw = "\n".join(html_parts).strip()
+            # Strip markdown code fences if present
+            if raw.startswith("```"):
+                lines = raw.splitlines()
+                raw = "\n".join(
+                    line for line in lines
+                    if not line.strip().startswith("```")
+                ).strip()
+            return raw
 
         if response.stop_reason != "tool_use":
             break
@@ -895,7 +650,6 @@ def run_analysis(
         for block in response.content:
             if block.type == "tool_use":
                 result = _dispatch(block.name, block.input, data, data2)
-                tool_results_store[block.name] = result
                 tool_results.append(
                     {
                         "type": "tool_result",
@@ -907,4 +661,4 @@ def run_analysis(
         if tool_results:
             messages.append({"role": "user", "content": tool_results})
 
-    return [], tool_results_store
+    return ""
