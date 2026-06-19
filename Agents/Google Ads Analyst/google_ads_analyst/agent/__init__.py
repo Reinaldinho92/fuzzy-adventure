@@ -31,9 +31,23 @@ from ..tools.analysis import (
     compare_periods,
 )
 
-_RAPPORT_OUTPUT_PROMPT = (
-    pathlib.Path(__file__).parent.parent / "RAPPORT_OUTPUT_PROMPT.md"
-).read_text(encoding="utf-8")
+_REPO_ROOT = pathlib.Path(__file__).parent.parent.parent.parent.parent
+
+
+def _load_md(path: pathlib.Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return ""
+
+
+_CLAUDE_MD = _load_md(_REPO_ROOT / "CLAUDE.md")
+_AGENT_MD = _load_md(_REPO_ROOT / "Agents" / "Google Ads Analyst" / "AGENT.md")
+_STIJLGIDS = _load_md(_REPO_ROOT / "shared" / "nl-stijlgids-klant-output.md")
+_BESLISSINGSLOG = _load_md(_REPO_ROOT / "docs" / "beslissingslog.md")
+_RAPPORT_OUTPUT_PROMPT = _load_md(
+    _REPO_ROOT / "Agents" / "Google Ads Analyst" / "google_ads_analyst" / "RAPPORT_OUTPUT_PROMPT.md"
+)
 
 _SYSTEM_PROMPT_BASE = """Je bent een Google Ads analist van Search Signals, een B2B digitaal \
 marketingbureau. Je helpt klanten hun Google Ads campagnes begrijpen, optimaliseren en \
@@ -207,7 +221,22 @@ Wat niet verandert:
 - Alle getallen zijn in Nederlandse notatie (punt als duizendtalscheider, komma als decimaal)
 - Elke grafiek heeft een tekstalternatief (`aria-label` op `<canvas>` + `<p class="chart-caption">`)"""
 
-_SYSTEM_PROMPT = _SYSTEM_PROMPT_BASE + "\n\n---\n\n" + _RAPPORT_OUTPUT_PROMPT
+def _md_section(title: str, content: str) -> str:
+    if not content.strip():
+        return ""
+    return f"\n\n---\n\n## {title}\n\n{content}"
+
+
+_SYSTEM_PROMPT = (
+    _md_section("Projectcontext (CLAUDE.md)", _CLAUDE_MD)
+    + _md_section("Agentdocumentatie (AGENT.md)", _AGENT_MD)
+    + _md_section("Stijlgids klantoutput", _STIJLGIDS)
+    + _md_section("Beslissingslog", _BESLISSINGSLOG)
+    + "\n\n---\n\n"
+    + _SYSTEM_PROMPT_BASE
+    + "\n\n---\n\n"
+    + _RAPPORT_OUTPUT_PROMPT
+)
 
 
 _TOOLS = [
