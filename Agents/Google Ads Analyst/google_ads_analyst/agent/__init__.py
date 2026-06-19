@@ -44,7 +44,7 @@ def _load_md(path: pathlib.Path) -> str:
 _CLAUDE_MD = _load_md(_REPO_ROOT / "CLAUDE.md")
 _AGENT_MD = _load_md(_REPO_ROOT / "Agents" / "Google Ads Analyst" / "AGENT.md")
 _STIJLGIDS = _load_md(_REPO_ROOT / "shared" / "nl-stijlgids-klant-output.md")
-_BESLISSINGSLOG = _load_md(_REPO_ROOT / "docs" / "beslissingslog.md")
+_BESLISSINGSLOG = _load_md(_REPO_ROOT / "Agents" / "Google Ads Analyst" / "beslissingslog.md")
 _RAPPORT_OUTPUT_PROMPT = _load_md(
     _REPO_ROOT / "Agents" / "Google Ads Analyst" / "google_ads_analyst" / "RAPPORT_OUTPUT_PROMPT.md"
 )
