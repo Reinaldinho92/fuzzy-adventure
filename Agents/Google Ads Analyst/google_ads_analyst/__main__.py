@@ -35,7 +35,6 @@ except ImportError:
 
 from .config import Config
 from .tools.excel_parser import parse_files, validate
-from .tools.html_renderer import render_html
 from .agent import run_analysis
 
 
@@ -152,12 +151,10 @@ def main() -> None:
 
     _print("Analyse uitvoeren...\n", "dim")
     try:
-        sections, tool_results = run_analysis(data, focus=args.focus, data2=data2)
+        html = run_analysis(data, focus=args.focus, data2=data2)
     except Exception as exc:
         _print(f"[red]Fout tijdens analyse: {exc}[/red]")
         sys.exit(1)
-
-    html = render_html(data, tool_results, sections, data2=data2)
 
     # Sla op als bestand
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

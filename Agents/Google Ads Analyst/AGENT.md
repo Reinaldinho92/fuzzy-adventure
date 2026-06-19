@@ -2,11 +2,11 @@
 
 ## Rol
 Analyseert Google Ads campagneprestaties op basis van Excel/CSV-exports en levert een
-strategisch rapport met concrete optimalisatieaanbevelingen. Richt zich op het vinden van
+strategisch HTML-rapport met concrete optimalisatieaanbevelingen. Richt zich op het vinden van
 verspild budget, kansen voor opschaling en structurele verbeterpunten.
 
 ## Status
-Operationeel — versie 1.0
+Operationeel — versie 2.0
 
 ## Gebruik
 
@@ -78,30 +78,58 @@ De agent ondersteunt vier rapportniveaus. Exporteer ze apart of combineer in é�
 | `get_search_term_opportunities` | Zoektermen die als exact zoekwoord toegevoegd kunnen worden |
 | `get_negative_keyword_candidates` | Zoektermen die uitsluitingszoekwoorden moeten worden |
 | `get_budget_analysis` | Budgetgelimiteerde en onderbenutte campagnes |
+| `get_impression_share_analysis` | Vertoningsaandeel per campagne, verlies door budget vs. ad rank |
+| `get_roas_analysis` | ROAS per campagne/advertentiegroep/zoekwoord |
+| `get_auction_insights` | Concurrenten en hun vertoningsaandeel, overlappingspercentage |
 | `compare_periods` | Vergelijking twee periodes: delta's in kosten, conversies, CPA |
 
 ## Rapportstructuur
 
-Het rapport is ingedeeld in vijf secties:
-1. **Samenvatting** — totale KPI's en 2–3 meest opvallende bevindingen
-2. **Sterktes** — wat werkt goed en waarom
-3. **Prioriteit 1** — directe kansen (hoge impact, lage inspanning)
-4. **Prioriteit 2** — structurele verbeteringen (hogere inspanning, grotere impact)
-5. **Prioriteit 3** — aandachtspunten en waarschuwingssignalen
+Claude genereert het volledige HTML-rapport zelf op basis van de tool-resultaten. Het rapport
+bevat altijd vier verplichte secties, aangevuld met optionele secties op basis van beschikbare data.
+
+**Verplichte secties:**
+1. **Samenvatting** — KPI-scorekaarten en 3–5 meest opvallende bevindingen
+2. **Impactacties voor de specialist** — concrete acties met verwacht effect in € of conversies
+3. **Update voor de klant** — positieve formulering, geen jargon, gefocust op voortgang
+4. **Punten om in de gaten te houden** — signalen, trends en risico's voor de volgende maand
+
+**Optionele secties** (op basis van beschikbare data):
+campagnes, zoekwoorden, verspild_budget, kansen, kwaliteitsscore, vertoningsaandeel, periodecomparatie
+
+De visuele opmaak (CSS, kleuren, componentstijlen) ligt vast in `RAPPORT_OUTPUT_PROMPT.md`.
+Claude bepaalt welke secties worden opgenomen en in welke volgorde, maar past de stijlen niet aan.
+
+## Dataflow
+
+```
+Exportbestanden (xlsx/csv)
+        ↓
+  excel_parser.py  →  AdsData object
+        ↓
+  agent/__init__.py
+    ├── Claude roept analysetools aan (tool use loop)
+    │     └── analysis.py levert JSON-resultaten
+    └── Claude genereert volledig HTML-rapport
+          (op basis van tool-resultaten + RAPPORT_OUTPUT_PROMPT.md)
+        ↓
+  __main__.py  →  rapport_[naam]_[periode].html opgeslagen + stdout
+```
 
 ## Bestandsstructuur
 
 ```
 google_ads_analyst/
-├── __main__.py          → CLI entry point
+├── __main__.py              → CLI entry point
 ├── __init__.py
-├── config.py            → API-sleutel en modelconfiguratie
+├── config.py                → API-sleutel en modelconfiguratie
 ├── requirements.txt
 ├── .env.example
+├── RAPPORT_OUTPUT_PROMPT.md → HTML-bouwhandleiding: vaste CSS, skelet, componentstijlen
 ├── agent/
-│   └── __init__.py      → Agent-logica, system prompt, tool-definities
+│   └── __init__.py          → Agent-logica, system prompt, tool-definities, run_analysis()
 └── tools/
     ├── __init__.py
-    ├── excel_parser.py  → Parser voor Google Ads exports (xlsx/csv)
-    └── analysis.py      → Analysemodules (tools die de agent aanroept)
+    ├── excel_parser.py      → Parser voor Google Ads exports (xlsx/csv)
+    └── analysis.py          → Analysemodules (tools die de agent aanroept)
 ```
